@@ -1,0 +1,15 @@
+{
+  "name": "sotb-waterquality",
+  "version": "0.0.1",
+  "scripts": {
+    "dev": "lite-server"
+  },
+  "license": "ISC",
+  "dependencies": {
+    "bootstrap": "3.3.6"
+  },
+  "devDependencies": {
+    "lite-server": "^2.0.1"
+  }
+}
+
