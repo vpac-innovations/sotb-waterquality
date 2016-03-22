@@ -13,6 +13,10 @@
       }
     </style>
 
+    <script src="d3/d3.js"></script>
+    <link rel="stylesheet" href="nvd3/build/nv.d3.css"></link>
+    <script src="nvd3/build/nv.d3.js"></script>
+
     <link rel="stylesheet" href="http://libs.cartocdn.com/cartodb.js/v3/3.15/themes/css/cartodb.css" />
   </head>
   <body>
@@ -34,16 +38,17 @@
         '      <h4>temp</h4>',
         '      <p>{{temp}}</p>',
         '    </div>',
-        '    <div id="chart_div">',
+        '    <div id="chart">',
+        '      <svg style="height:300px; width:400px;"> </svg>',
         '      <script>',
-        '        draw_chart({{content.data.site_id}})',
+        '        query_chart_data({{content.data.site_id}})',
         '      </scr' + 'ipt>',
         '    </div>',
         '  </div>',
         '  <div class="cartodb-popup-tip-container"></div>',
         '</div>'].join('');
 
-      function draw_chart(site_id) {
+      function query_chart_data(site_id) {
           if (!site_id) {
               return;
           }
@@ -63,9 +68,66 @@
             'ON res.site_id = waterquality_data.site_id '+
             'WHERE res.site_id = ' + site_id + ' ' +
             'ORDER BY site_id, sampledate ';
-          $.getJSON('https://lachlanhurst.cartodb.com/api/v2/sql?q=' + query, function(data) {
-              console.log(data);
-          });
+          var queryUrl = 'https://lachlanhurst.cartodb.com/api/v2/sql?q=' + query;
+
+          d3.json(queryUrl, function(data) {
+
+              var tickMultiFormat = d3.time.format.multi([
+                          ["%-I:%M%p", function(d) { return d.getMinutes(); }], // not the beginning of the hour
+                          ["%-I%p", function(d) { return d.getHours(); }], // not midnight
+                          ["%b %-d", function(d) { return d.getDate() != 1; }], // not the first of the month
+                          ["%b %-d", function(d) { return d.getMonth(); }], // not Jan 1st
+                          ["%Y", function() { return true; }]
+                      ]);
+
+              var correctData = [
+              {
+                  key: "Temperature",
+                  values: data.rows
+              }
+              ]
+
+              nv.addGraph(function() {
+                var chart = nv.models.lineChart()
+                              .xScale(d3.time.scale())
+                              .x(function(d) {
+                                  var dateOnly = d.sampledate.substr(0,10);
+                                  return d3.time.format("%Y-%m-%d").parse(dateOnly);
+                              })
+                              .y(function(d) {
+                                  return d.temperature;
+                              })
+                              .color(d3.scale.category10().range())
+                              .useInteractiveGuideline(true)
+                              .margin({"left": 30, "right": 20, "top": 20, "bottom": 30,})
+                              ;
+
+
+                 //chart.forceX(parseInt(data.rows[0].sampledate.substr(0,4)), parseInt(data.rows[data.rows.length-1].sampledate.substr(0,4)));
+
+                 chart.xAxis
+                    .showMaxMin(false)
+                    .tickPadding(10)
+                    .tickFormat(function (d) { return tickMultiFormat(new Date(d)); })
+                    ;
+
+                chart.yAxis
+                    .showMaxMin(false)
+                    .tickFormat(d3.format('s'))
+                    ;
+
+                d3.select('#chart svg')
+                    .datum(correctData)
+                    .transition()
+                    .call(chart);
+
+                //TODO: Figure out a good way to do this automatically
+                nv.utils.windowResize(chart.update);
+
+                return chart;
+              });
+            });
+
       }
 
       function main() {
@@ -87,7 +149,7 @@
           infowindow.set({
               'template':INFOWINDOW_TEMPLATE,
               sanitizeTemplate: false,
-              width:      328,
+              width:      400,
               maxHeight:  400
           });
 
